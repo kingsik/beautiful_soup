@@ -1,0 +1,71 @@
+import codecademylib3_seaborn
+from collections import deque
+from bs4 import BeautifulSoup
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+response = requests.get('https://content.codecademy.com/courses/beautifulsoup/cacao/index.html')
+
+soup = BeautifulSoup(response.content, 'html.parser')
+#print(soup.prettify())
+
+## Creating a ratings histogram - Method 1
+#ratings = soup.select('.Rating')
+#ratings_list = []
+#for i, tag in enumerate(ratings):
+#  if i == 0:
+#    continue
+#  ratings_list.append(float(tag.get_text()))
+#
+#plt.hist(ratings_list)
+#plt.show()
+## End of Method 1
+
+## Creating a ratings histogram - Method 2
+table = soup.find(id='cacaoTable')
+df = pd.read_html(str(table), header=0)[0]
+df.rename({'Company (Maker-if known)':'Company'}, axis=1, inplace=True)
+ratings = df.Rating.copy()
+ratings.hist()
+plt.show()
+## End of Method 2 
+
+## Getting company names - Method 1
+#companies = soup.select('.Company')
+#company_list = []
+#for i, company in enumerate(companies):
+#  if i == 0:
+#    continue
+#  company_list.append(company.get_text())
+#print(company_list)
+## End of Method 1
+
+## Getting company names - Method 2 continuing from previous pandas df
+comp_rating_df = df[['Company','Rating']].copy()
+rating_by_comp_df = comp_rating_df.groupby('Company')
+mean = rating_by_comp_df.mean()
+#print(mean.nlargest(10, 'Rating'))
+
+## Investigating the link between rating and coaca %
+for i, row in df.iterrows():
+  row_percent = row['Cocoa  Percent']
+  len_row = len(row_percent) - 1
+  df.loc[i, 'Cocoa  Percent'] = float(row_percent[:len_row])
+
+# Cast Cocoa Percent as float64 dtype
+df['Cocoa  Percent'] = df['Cocoa  Percent'].astype('float64')
+comp_rate_cocoa_df = df[['Company','Rating','Cocoa  Percent']].copy()
+comp_rate_cocoa_df.rename({'Cocoa  Percent':'CocoaPercentage'}, axis=1, inplace=True)
+plt.clf()
+plt.scatter(comp_rate_cocoa_df['CocoaPercentage'], comp_rate_cocoa_df['Rating'])
+z = np.polyfit(comp_rate_cocoa_df.CocoaPercentage, comp_rate_cocoa_df.Rating, 1)
+line_function = np.poly1d(z)
+plt.plot(comp_rate_cocoa_df.CocoaPercentage, line_function(comp_rate_cocoa_df.CocoaPercentage), "r--")
+plt.show()
+
+## Find which country has the best ratings
+country_rate_df = df[['Company  Location','Rating']]
+rating_by_country_df = country_rate_df.groupby('Company  Location')
+print(rating_by_country_df.mean().nlargest(10, 'Rating'))
